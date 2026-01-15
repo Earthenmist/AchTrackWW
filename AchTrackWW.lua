@@ -130,17 +130,43 @@ local WATCH_LIST = {
   "Secrets of the K'areshi",
 }
 
--- Optional SavedVariables (declared in the .toc)
+-- =========================================================
+-- SavedVariables (declared in the .toc)
+-- =========================================================
 AchTrackWWDB = AchTrackWWDB or {}
+AchTrackWWDB.resolvedByLabel = AchTrackWWDB.resolvedByLabel or {}
+AchTrackWWDB.ui = AchTrackWWDB.ui or {}
+if AchTrackWWDB.ui.showIncompleteOnly == nil then
+  AchTrackWWDB.ui.showIncompleteOnly = false
+end
 
 -- =========================================================
 -- Achievement resolution + runtime building
 -- =========================================================
+
+local function GetAchievementCategoryList()
+  if C_AchievementInfo and C_AchievementInfo.GetCategoryList then
+    return C_AchievementInfo.GetCategoryList()
+  end
+  if GetCategoryList then
+    return GetCategoryList()
+  end
+  return nil
+end
+
+-- Session cache so we don't rescan all achievements every time UI opens
+local SESSION_TITLE_INDEX = nil
+
 local function BuildAchievementTitleIndex()
+  if SESSION_TITLE_INDEX then return SESSION_TITLE_INDEX end
+
   local index = {}
-  if not GetCategoryList then return index end
-  local cats = GetCategoryList()
-  if not cats then return index end
+  local cats = GetAchievementCategoryList()
+  if not cats then
+    SESSION_TITLE_INDEX = index
+    return index
+  end
+
   for _, catID in ipairs(cats) do
     local num = GetCategoryNumAchievements(catID)
     for i = 1, num do
@@ -150,6 +176,8 @@ local function BuildAchievementTitleIndex()
       end
     end
   end
+
+  SESSION_TITLE_INDEX = index
   return index
 end
 
@@ -164,8 +192,13 @@ local function BuildRuntimeList()
 
   for _, entry in ipairs(WATCH_LIST) do
     if type(entry) == "string" then
-      local id = idx[entry]
+      -- Locale-safe persistence: store resolved IDs by label/title
+      local id = AchTrackWWDB.resolvedByLabel[entry] or idx[entry]
+      if id then
+        AchTrackWWDB.resolvedByLabel[entry] = id
+      end
       table.insert(items, { label = entry, ids = id and { id } or {} })
+
     elseif type(entry) == "table" then
       local label = entry.label or entry.title or "(unnamed)"
       local ids = {}
@@ -173,15 +206,21 @@ local function BuildRuntimeList()
       if type(entry.any) == "table" then
         for _, id in ipairs(entry.any) do table.insert(ids, id) end
       end
+
       if #ids == 0 then
         local key = entry.title or label
-        local rid = idx[key]
-        if rid then table.insert(ids, rid) end
+        local rid = AchTrackWWDB.resolvedByLabel[key] or idx[key]
+        if rid then
+          AchTrackWWDB.resolvedByLabel[key] = rid
+          table.insert(ids, rid)
+        end
       end
+
       local requires = nil
       if entry.requires then
         requires = type(entry.requires) == "table" and entry.requires or { entry.requires }
       end
+
       local requires_labels = nil
       if entry.requires_labels then
         requires_labels = {}
@@ -189,6 +228,7 @@ local function BuildRuntimeList()
           table.insert(requires_labels, lname)
         end
       end
+
       table.insert(items, { label = label, ids = ids, requires = requires, requires_labels = requires_labels })
     end
   end
@@ -265,9 +305,19 @@ end
 -- =========================================================
 local function OpenToAchievement(achID)
   if not achID then return end
-  if not AchievementFrame then UIParentLoadAddOn("Blizzard_AchievementUI") end
+
+  if CanShowAchievementUI and not CanShowAchievementUI() then
+    print("|cffffd200AchTrackWW:|r Achievement UI is not available right now.")
+    return
+  end
+
+  if not AchievementFrame then
+    UIParentLoadAddOn("Blizzard_AchievementUI")
+  end
   if not AchievementFrame then return end
+
   ShowUIPanel(AchievementFrame)
+
   if AchievementFrame_SelectAchievement then
     AchievementFrame_SelectAchievement(achID)
   elseif AchievementFrame_DisplayAchievement then
@@ -309,8 +359,26 @@ local function CreateMainFrame()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -4, -4)
 
+  -- Incomplete-only checkbox (top-right)
+  local cb = CreateFrame("CheckButton", "AchTrackWW_IncompleteOnly", f, "UICheckButtonTemplate")
+  cb:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -34)
+  cb:SetSize(24, 24)
+  cb:SetChecked(AchTrackWWDB.ui.showIncompleteOnly)
+
+  local cbText = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  cbText:SetPoint("LEFT", cb, "RIGHT", 6, 1)
+  cbText:SetText("Incomplete only")
+
+  cb:SetScript("OnClick", function(self)
+    AchTrackWWDB.ui.showIncompleteOnly = self:GetChecked() and true or false
+    if UI.frame and UI.frame:IsShown() then
+      -- Rebuild rows immediately
+      CreateOrUpdateRows()
+    end
+  end)
+
   local scrollFrame = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
-  scrollFrame:SetPoint("TOPLEFT", 12, -36)
+  scrollFrame:SetPoint("TOPLEFT", 12, -64)
   scrollFrame:SetPoint("BOTTOMRIGHT", -30, 12)
 
   local content = CreateFrame("Frame", nil, scrollFrame)
@@ -321,6 +389,7 @@ local function CreateMainFrame()
   UI.scroll = scrollFrame
   UI.content = content
   UI.rows = {}
+  UI.incompleteCB = cb
 
   return f
 end
@@ -340,10 +409,8 @@ end
 -- ===== Sorting helpers: locked -> incomplete -> complete -> unresolved
 local function GetStatusForSort(item)
   local locked = false
-  local _, _, _ = nil, nil, nil
   if LABEL_INDEX then
-    locked = GetLockInfo(item)
-    if type(locked) == "table" then locked = locked[1] end
+    locked = select(1, GetLockInfo(item))
   end
   if not locked then
     local done = IsAnyAchievementEarned(item.ids)
@@ -360,7 +427,21 @@ local function sortVal(v)
 end
 -- ===== End helpers
 
-local function CreateOrUpdateRows()
+local function IconString(icon)
+  if not icon then return "" end
+  return "|T" .. icon .. ":14:14:0:0:64:64:4:60:4:60|t "
+end
+
+
+local function StatusIcon(done)
+  if done then
+    return "|TInterface\\RaidFrame\\ReadyCheck-Ready:14:14|t"
+  else
+    return "|TInterface\\RaidFrame\\ReadyCheck-NotReady:14:14|t"
+  end
+end
+
+function CreateOrUpdateRows()
   CreateMainFrame()
   local parent = UI.content
   local y = -4
@@ -381,105 +462,111 @@ local function CreateOrUpdateRows()
   end)
 
   for _, data in ipairs(runtime) do
-    local row = CreateFrame("Button", nil, parent)
-    row:SetSize(460, 22)
-    row:SetPoint("TOPLEFT", 6, y)
-    y = y - 24
-
-    row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-    row:GetHighlightTexture():SetAlpha(0.25)
-    row:EnableMouse(true)
-    row:RegisterForClicks("LeftButtonUp")
-
-    row.titleFS = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    row.titleFS:SetPoint("LEFT")
-
-    -- Determine locked state from numeric + label prerequisites
-    local locked, unmetID, unmetLabel = GetLockInfo(data)
-
-    local label = data.label
-    local status
-
-    if not data.ids or #data.ids == 0 then
-      status = nil
-      label = label .. "  (not found – try /achfind \"" .. data.label .. "\")"
-    elseif locked then
-      status = "locked"
-      label = label .. "  (locked: complete prerequisite)"
+    local completed = IsAnyAchievementEarned(data.ids)
+    if AchTrackWWDB.ui.showIncompleteOnly and completed == true then
+      -- Skip completed entries when toggle enabled
     else
-      status = IsAnyAchievementEarned(data.ids)
-    end
+      local row = CreateFrame("Button", nil, parent)
+      row:SetSize(460, 22)
+      row:SetPoint("TOPLEFT", 6, y)
+      y = y - 24
 
-    row.titleFS:SetText(label)
-    ColorText(row.titleFS, status)
+      row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
+      row:GetHighlightTexture():SetAlpha(0.25)
+      row:EnableMouse(true)
+      row:RegisterForClicks("LeftButtonUp")
 
-    row:SetScript("OnClick", function()
-      if locked then
-        if unmetID then
-          OpenToAchievement(unmetID)
-        elseif unmetLabel and LABEL_INDEX[unmetLabel] then
-          local openID = PreferredOpenID(LABEL_INDEX[unmetLabel].ids)
-          if openID then OpenToAchievement(openID) end
+      row.titleFS = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      row.titleFS:SetPoint("LEFT")
+
+      -- Determine locked state from numeric + label prerequisites
+      local locked, unmetID, unmetLabel = GetLockInfo(data)
+
+      local label = data.label
+      local status
+
+      if not data.ids or #data.ids == 0 then
+        status = nil
+        label = label .. "  (not found – try /achfind \"" .. data.label .. "\")"
+      elseif locked then
+        status = "locked"
+        label = label .. "  (locked: complete prerequisite)"
+      else
+        status = completed
+      end
+
+      row.titleFS:SetText(label)
+      ColorText(row.titleFS, status)
+
+      row:SetScript("OnClick", function()
+        if locked then
+          if unmetID then
+            OpenToAchievement(unmetID)
+          elseif unmetLabel and LABEL_INDEX[unmetLabel] then
+            local openID = PreferredOpenID(LABEL_INDEX[unmetLabel].ids)
+            if openID then OpenToAchievement(openID) end
+          else
+            -- Fall back to opening this row if we can't resolve the unmet target
+            local openID = PreferredOpenID(data.ids)
+            if openID then OpenToAchievement(openID) end
+          end
         else
-          -- Fall back to opening this row if we can't resolve the unmet target
           local openID = PreferredOpenID(data.ids)
           if openID then OpenToAchievement(openID) end
         end
-      else
-        local openID = PreferredOpenID(data.ids)
-        if openID then OpenToAchievement(openID) end
-      end
-    end)
+      end)
 
-    row:SetScript("OnEnter", function(self)
-      GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-      GameTooltip:AddLine(data.label)
+      row:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(data.label)
 
-      -- Show label-based prerequisites
-      if data.requires_labels and #data.requires_labels > 0 then
-        GameTooltip:AddLine("Prerequisite(s) by label:", 0.9, 0.9, 0.9)
-        for _, lname in ipairs(data.requires_labels) do
-          local complete = IsLabelItemComplete(lname)
-          local mark = complete and "|cff20ff20✓|r" or "|cffff4040✗|r"
-          GameTooltip:AddLine(string.format("  %s %s", mark, lname))
+        -- Show label-based prerequisites
+        if data.requires_labels and #data.requires_labels > 0 then
+          GameTooltip:AddLine("Prerequisite(s) by label:", 0.9, 0.9, 0.9)
+          for _, lname in ipairs(data.requires_labels) do
+            local complete = IsLabelItemComplete(lname)
+            GameTooltip:AddLine(string.format("  %s %s", StatusIcon(complete), lname))
+          end
         end
-      end
 
-      -- Show numeric-ID prerequisites
-      if data.requires and #data.requires > 0 then
-        GameTooltip:AddLine("Prerequisite(s):", 0.9, 0.9, 0.9)
-        for _, rid in ipairs(data.requires) do
-          local rname = select(1, GetAchievementInfo(rid))
-          local reqDone = IsIDEarned(rid)
-          local mark = reqDone and "|cff20ff20✓|r" or "|cffff4040✗|r"
-          GameTooltip:AddLine(string.format("  %s %s (ID %d)", mark, rname or "?", rid))
+        -- Show numeric-ID prerequisites
+        if data.requires and #data.requires > 0 then
+          GameTooltip:AddLine("Prerequisite(s):", 0.9, 0.9, 0.9)
+          for _, rid in ipairs(data.requires) do
+            local rname = select(1, GetAchievementInfo(rid))
+            local reqDone = IsIDEarned(rid)
+            GameTooltip:AddLine(string.format("  %s %s (ID %d)", StatusIcon(reqDone), rname or "?", rid))
+          end
         end
-      end
 
-      if locked then
-        GameTooltip:AddLine("This achievement is locked until prerequisites are complete.", 1, 0.82, 0)
-      end
-
-      if data.ids and #data.ids > 0 then
-        GameTooltip:AddLine("Progress:", 0.9, 0.9, 0.9)
-        for _, id in ipairs(data.ids) do
-          local name, _, _, completed, _, _, _, _, _, icon = GetAchievementInfo(id)
-          local mark = completed and "|cff20ff20✓|r" or "|cffff4040✗|r"
-          GameTooltip:AddLine(string.format("  %s %s (ID %d)", mark, name or "?", id))
-          if icon then GameTooltip:AddTexture(icon) end
+        if locked then
+          GameTooltip:AddLine("This achievement is locked until prerequisites are complete.", 1, 0.82, 0)
         end
-        GameTooltip:AddLine(locked and "Click to open an unmet prerequisite." or "Click to open in the Achievement UI.", 0.8, 0.8, 0.8)
-      else
-        GameTooltip:AddLine("Not auto-resolved. Use /achfind and update the list.", 1, 1, 1, true)
-      end
-      GameTooltip:Show()
-    end)
-    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    table.insert(UI.rows, row)
+        if data.ids and #data.ids > 0 then
+          GameTooltip:AddLine("Progress:", 0.9, 0.9, 0.9)
+          for _, id in ipairs(data.ids) do
+            local name, _, _, done, _, _, _, _, _, icon = GetAchievementInfo(id)
+            GameTooltip:AddLine(string.format("  %s %s%s (ID %d)", StatusIcon(done), IconString(icon), name or "?", id))
+          end
+          GameTooltip:AddLine(locked and "Click to open an unmet prerequisite." or "Click to open in the Achievement UI.", 0.8, 0.8, 0.8)
+        else
+          GameTooltip:AddLine("Not auto-resolved. Use /achfind and update the list.", 1, 1, 1, true)
+        end
+        GameTooltip:Show()
+      end)
+      row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+      table.insert(UI.rows, row)
+    end
   end
 
   parent:SetSize(460, -y + 8)
+
+  -- Keep checkbox state synced (in case toggled via slash)
+  if UI.incompleteCB then
+    UI.incompleteCB:SetChecked(AchTrackWWDB.ui.showIncompleteOnly)
+  end
 end
 
 local function RefreshUI()
@@ -502,6 +589,12 @@ f:SetScript("OnEvent", function(self, event, ...)
     local name = ...
     if name ~= "AchTrackWW" then return end
     AchTrackWWDB = AchTrackWWDB or {}
+    AchTrackWWDB.resolvedByLabel = AchTrackWWDB.resolvedByLabel or {}
+    AchTrackWWDB.ui = AchTrackWWDB.ui or {}
+    if AchTrackWWDB.ui.showIncompleteOnly == nil then
+      AchTrackWWDB.ui.showIncompleteOnly = false
+    end
+
     CreateMainFrame()
     -- Small delay ensures achievement data is populated
     C_Timer.After(2, function() CreateOrUpdateRows() end)
@@ -531,6 +624,17 @@ SlashCmdList["ACHTRACKWW"] = function()
   end
 end
 
+-- Toggle incomplete-only
+SLASH_ACHINCOMPLETE1 = "/achincomplete"
+SlashCmdList["ACHINCOMPLETE"] = function()
+  AchTrackWWDB.ui.showIncompleteOnly = not AchTrackWWDB.ui.showIncompleteOnly
+  if UI.incompleteCB then
+    UI.incompleteCB:SetChecked(AchTrackWWDB.ui.showIncompleteOnly)
+  end
+  CreateOrUpdateRows()
+  print("|cffffd200AchTrackWW:|r Incomplete only: " .. (AchTrackWWDB.ui.showIncompleteOnly and "ON" or "OFF"))
+end
+
 -- /achfind <keyword> : quick search helper
 SLASH_ACHFINDWW1 = "/achfind"
 SlashCmdList["ACHFINDWW"] = function(msg)
@@ -539,7 +643,7 @@ SlashCmdList["ACHFINDWW"] = function(msg)
     print("|cffffd200AchTrackWW:|r Usage: /achfind <keyword>")
     return
   end
-  local cats = GetCategoryList and GetCategoryList() or nil
+  local cats = GetAchievementCategoryList()
   if not cats then
     print("|cffff2020AchTrackWW:|r Achievement API not ready.")
     return
