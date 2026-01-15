@@ -1,5 +1,12 @@
 local ADDON, ns = ...
 
+-- Minimap support: allow external modules (e.g. minimap.lua) to toggle the window
+ns.ToggleWindow = function()
+  if SlashCmdList and SlashCmdList["ACHTRACKWW"] then
+    SlashCmdList["ACHTRACKWW"]()
+  end
+end
+
 -- =========================================================
 -- Watch list
 -- Each entry may be:
@@ -588,6 +595,10 @@ f:SetScript("OnEvent", function(self, event, ...)
   if event == "ADDON_LOADED" then
     local name = ...
     if name ~= "AchTrackWW" then return end
+
+    if ns and ns.InitMinimap then
+      ns.InitMinimap()
+    end
     AchTrackWWDB = AchTrackWWDB or {}
     AchTrackWWDB.resolvedByLabel = AchTrackWWDB.resolvedByLabel or {}
     AchTrackWWDB.ui = AchTrackWWDB.ui or {}
