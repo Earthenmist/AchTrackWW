@@ -393,6 +393,7 @@ local function CreateMainFrame()
   scrollFrame:SetScrollChild(content)
 
   UI.frame = f
+  tinsert(UISpecialFrames, f:GetName())
   UI.scroll = scrollFrame
   UI.content = content
   UI.rows = {}
@@ -691,3 +692,4 @@ SlashCmdList["ACHREFRESHWW"] = function()
   CreateOrUpdateRows()
   print("|cffffd200AchTrackWW:|r Refreshed.")
 end
+
