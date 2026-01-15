@@ -2,7 +2,7 @@
 ## Title: AchTrackWW – Achievement Tracker
 ## Notes: Tracks a curated list of War Within + Undermine + K'aresh achievements.
 ## Author: Lanni of Alonsus
-## Version: 1.0.3
+## Version: 1.0.4
 
 ## IconTexture: Interface\AddOns\AchTrackWW\Images\AchTrackWWLogo
 ## DefaultState: Enabled
@@ -18,3 +18,4 @@ Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 
 minimap.lua
 AchTrackWW.lua
+
