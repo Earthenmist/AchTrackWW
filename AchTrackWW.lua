@@ -332,6 +332,76 @@ local function OpenToAchievement(achID)
   end
 end
 
+
+-- =========================================================
+-- Achievement tracking (Right-click)
+-- Uses modern ContentTracking when available; falls back to legacy achievement tracking.
+-- =========================================================
+local function RefreshTrackerUI()
+  if AchievementFrameAchievements_ForceUpdate then
+    AchievementFrameAchievements_ForceUpdate()
+  end
+  if WatchFrame_Update then
+    WatchFrame_Update()
+  end
+  if ObjectiveTracker_Update then
+    ObjectiveTracker_Update()
+  end
+end
+
+
+local function IsTrackedAchievement(id)
+  if not id then return false end
+
+  -- Modern ContentTracking API
+  if C_ContentTracking and C_ContentTracking.IsTracking and Enum and Enum.ContentTrackingType then
+    local ok, tracked = pcall(C_ContentTracking.IsTracking, Enum.ContentTrackingType.Achievement, id)
+    if ok then return tracked and true or false end
+  end
+
+  -- Legacy tracked achievements API
+  if GetTrackedAchievements then
+    for _, tid in ipairs(GetTrackedAchievements()) do
+      if tid == id then return true end
+    end
+  end
+
+  return false
+end
+
+local function ToggleTrackedAchievement(id)
+  if not id then return nil, "NoID" end
+
+  -- Modern API (Retail 10.1.5+): ContentTracking
+  if C_ContentTracking and Enum and Enum.ContentTrackingType and C_ContentTracking.ToggleTracking then
+    local err = C_ContentTracking.ToggleTracking(Enum.ContentTrackingType.Achievement, id, Enum and Enum.ContentTrackingStopType and Enum.ContentTrackingStopType.Manual or 2)
+    RefreshTrackerUI()
+    return err == nil, err
+  end
+
+  -- Legacy API
+  if AddTrackedAchievement and RemoveTrackedAchievement and GetTrackedAchievements then
+    local tracked = false
+    for _, tid in ipairs(GetTrackedAchievements()) do
+      if tid == id then tracked = true break end
+    end
+
+    if tracked then
+      RemoveTrackedAchievement(id)
+      RefreshTrackerUI()
+      return false, nil
+    else
+      AddTrackedAchievement(id)
+      RefreshTrackerUI()
+      return true, nil
+    end
+  end
+
+  return nil, "NoAPI"
+end
+
+
+
 -- =========================================================
 -- UI
 -- =========================================================
@@ -482,7 +552,7 @@ function CreateOrUpdateRows()
       row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
       row:GetHighlightTexture():SetAlpha(0.25)
       row:EnableMouse(true)
-      row:RegisterForClicks("LeftButtonUp")
+      row:RegisterForClicks("AnyUp")
 
       row.titleFS = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
       row.titleFS:SetPoint("LEFT")
@@ -506,7 +576,41 @@ function CreateOrUpdateRows()
       row.titleFS:SetText(label)
       ColorText(row.titleFS, status)
 
-      row:SetScript("OnClick", function()
+      row:SetScript("OnClick", function(self, button)
+        -- Right-click: toggle tracking in Blizzard's achievement tracker
+        if button == "RightButton" then
+          local trackID
+
+          if locked then
+            if unmetID then
+              trackID = unmetID
+            elseif unmetLabel and LABEL_INDEX[unmetLabel] then
+              trackID = PreferredOpenID(LABEL_INDEX[unmetLabel].ids)
+            end
+          end
+
+          trackID = trackID or PreferredOpenID(data.ids)
+
+          if trackID then
+            local wasTracked = IsTrackedAchievement(trackID)
+            ToggleTrackedAchievement(trackID)
+            local isTracked = IsTrackedAchievement(trackID)
+            local name = GetAchievementInfo(trackID)
+
+            if isTracked and not wasTracked then
+              print("|cffffd200AchTrackWW:|r Tracking: " .. (name or ("ID " .. trackID)))
+            elseif (not isTracked) and wasTracked then
+              print("|cffffd200AchTrackWW:|r Untracking: " .. (name or ("ID " .. trackID)))
+            elseif isTracked then
+              print("|cffffd200AchTrackWW:|r Already tracking: " .. (name or ("ID " .. trackID)))
+            else
+              print("|cffffd200AchTrackWW:|r Not tracked: " .. (name or ("ID " .. trackID)))
+            end
+          end
+          return
+        end
+
+        -- Left-click: open achievement in the Achievement UI
         if locked then
           if unmetID then
             OpenToAchievement(unmetID)
@@ -557,7 +661,7 @@ function CreateOrUpdateRows()
             local name, _, _, done, _, _, _, _, _, icon = GetAchievementInfo(id)
             GameTooltip:AddLine(string.format("  %s %s%s (ID %d)", StatusIcon(done), IconString(icon), name or "?", id))
           end
-          GameTooltip:AddLine(locked and "Click to open an unmet prerequisite." or "Click to open in the Achievement UI.", 0.8, 0.8, 0.8)
+          GameTooltip:AddLine(locked and "Left-click: open unmet prerequisite • Right-click: track/untrack" or "Left-click: open • Right-click: track/untrack", 0.8, 0.8, 0.8)
         else
           GameTooltip:AddLine("Not auto-resolved. Use /achfind and update the list.", 1, 1, 1, true)
         end
@@ -692,4 +796,3 @@ SlashCmdList["ACHREFRESHWW"] = function()
   CreateOrUpdateRows()
   print("|cffffd200AchTrackWW:|r Refreshed.")
 end
-
