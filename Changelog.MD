@@ -1,3 +1,18 @@
+📜 Changelog – Version 1.0.4  
+  
+📅 Release Date: 15-01-2026  
+  
+🛠️ Changes & Improvements  
+  
+Registered the frame with WoW’s Escape handling system  
+  
+Pressing ESC will:  
+  
+Close the window  
+Respect UI order (it won’t break other panels)  
+  
+  
+  
 📜 Changelog – Version 1.0.3  
   
 📅 Release Date: 15-01-2026  
