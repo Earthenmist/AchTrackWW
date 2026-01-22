@@ -164,6 +164,30 @@ end
 -- Session cache so we don't rescan all achievements every time UI opens
 local SESSION_TITLE_INDEX = nil
 
+-- Returns true if any WATCH_LIST entry still needs a title->ID resolution scan.
+-- If everything is already resolved in SavedVariables, we skip the expensive full achievement crawl.
+local function NeedsTitleResolutionScan()
+  if not AchTrackWWDB or not AchTrackWWDB.resolvedByLabel then return true end
+
+  for _, entry in ipairs(WATCH_LIST) do
+    if type(entry) == "string" then
+      if not AchTrackWWDB.resolvedByLabel[entry] then
+        return true
+      end
+    elseif type(entry) == "table" then
+      local hasFixedIDs = entry.id or (type(entry.any) == "table" and #entry.any > 0)
+      if not hasFixedIDs then
+        local key = entry.title or entry.label or entry.title or "(unnamed)"
+        if not AchTrackWWDB.resolvedByLabel[key] then
+          return true
+        end
+      end
+    end
+  end
+
+  return false
+end
+
 local function BuildAchievementTitleIndex()
   if SESSION_TITLE_INDEX then return SESSION_TITLE_INDEX end
 
@@ -195,7 +219,10 @@ local LABEL_INDEX = nil    -- map label -> item (same table refs as in RUNTIME)
 -- Returns array of { label, ids = {...}, requires = {... or nil}, requires_labels = {... or nil} }
 local function BuildRuntimeList()
   local items = {}
-  local idx = BuildAchievementTitleIndex()
+  local idx = {}
+  if NeedsTitleResolutionScan() then
+    idx = BuildAchievementTitleIndex()
+  end
 
   for _, entry in ipairs(WATCH_LIST) do
     if type(entry) == "string" then
@@ -712,8 +739,7 @@ f:SetScript("OnEvent", function(self, event, ...)
     end
 
     CreateMainFrame()
-    -- Small delay ensures achievement data is populated
-    C_Timer.After(2, function() CreateOrUpdateRows() end)
+    -- NOTE: UI rows are built lazily when the window is opened (prevents login/reload hitch).
 
   elseif event == "ACHIEVEMENT_EARNED" then
     if not refreshQueued then
