@@ -1,0 +1,75 @@
+name: Discord notifications
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main, master]
+  issues:
+    types: [opened, reopened, closed]
+  pull_request:
+    types: [opened, reopened, closed, ready_for_review, converted_to_draft]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide webhook + build message
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EVENT="${{ github.event_name }}"
+          REPO="${{ github.repository }}"
+
+          WEBHOOK="${{ secrets.DISCORD_WEBHOOK_DEV }}"
+
+          if [ "$EVENT" = "release" ]; then
+            WEBHOOK="${{ secrets.DISCORD_WEBHOOK_RELEASE }}"
+            NAME="${{ github.event.release.name }}"
+            TAG="${{ github.event.release.tag_name }}"
+            URL="${{ github.event.release.html_url }}"
+            MSG="## 🚀 ${NAME:-New Release} (${TAG})\n**Repo:** ${REPO}\n**Link:** ${URL}"
+
+          elif [ "$EVENT" = "push" ]; then
+            BRANCH="${{ github.ref_name }}"
+            COMMIT_MSG="${{ github.event.head_commit.message }}"
+            COMMIT_URL="${{ github.event.head_commit.url }}"
+            SHORT_SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
+            FIRST_LINE="$(echo "$COMMIT_MSG" | head -n 1)"
+            MSG="**📝 Push** to \`${BRANCH}\` — \`${SHORT_SHA}\`\n**Repo:** ${REPO}\n**Message:** ${FIRST_LINE}\n**Link:** ${COMMIT_URL}"
+
+          elif [ "$EVENT" = "issues" ]; then
+            ACTION="${{ github.event.action }}"
+            NUM="${{ github.event.issue.number }}"
+            TITLE="${{ github.event.issue.title }}"
+            URL="${{ github.event.issue.html_url }}"
+            MSG="**🪲 Issue ${ACTION}** — #${NUM}\n**Repo:** ${REPO}\n**Title:** ${TITLE}\n**Link:** ${URL}"
+
+          elif [ "$EVENT" = "pull_request" ]; then
+            ACTION="${{ github.event.action }}"
+            NUM="${{ github.event.pull_request.number }}"
+            TITLE="${{ github.event.pull_request.title }}"
+            URL="${{ github.event.pull_request.html_url }}"
+            MSG="**🔀 PR ${ACTION}** — #${NUM}\n**Repo:** ${REPO}\n**Title:** ${TITLE}\n**Link:** ${URL}"
+
+          else
+            MSG="GitHub event: ${EVENT} in ${REPO}"
+          fi
+
+          echo "webhook=$WEBHOOK" >> "$GITHUB_OUTPUT"
+          printf '%s' "$MSG" > message.txt
+
+      - name: Send message to Discord
+        shell: bash
+        run: |
+          python3 - << 'PY' > payload.json
+import json
+msg = open("message.txt", "r", encoding="utf-8").read()
+print(json.dumps({"content": msg}))
+PY
+
+          curl -sS -H "Content-Type: application/json" \
+            --data-binary @payload.json \
+            "${{ steps.build.outputs.webhook }}"
