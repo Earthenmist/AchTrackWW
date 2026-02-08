@@ -1,4 +1,4 @@
-# AchTrackWW – The War Within Meta Achievement Tracker   
+# AchTrackWW – The War Within Meta Achievement Tracker  
 
 Overview
 
