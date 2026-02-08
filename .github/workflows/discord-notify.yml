@@ -23,6 +23,7 @@ jobs:
           EVENT="${{ github.event_name }}"
           REPO="${{ github.repository }}"
 
+          # Default: dev channel
           WEBHOOK="${{ secrets.DISCORD_WEBHOOK_DEV }}"
 
           if [ "$EVENT" = "release" ]; then
@@ -35,8 +36,8 @@ jobs:
           elif [ "$EVENT" = "push" ]; then
             BRANCH="${{ github.ref_name }}"
             COMMIT_MSG="${{ github.event.head_commit.message }}"
-            COMMIT_URL="${{ github.event.head_commit.url }}"
             SHORT_SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
+            COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
             FIRST_LINE="$(echo "$COMMIT_MSG" | head -n 1)"
             MSG="**📝 Push** to \`${BRANCH}\` — \`${SHORT_SHA}\`\n**Repo:** ${REPO}\n**Message:** ${FIRST_LINE}\n**Link:** ${COMMIT_URL}"
 
@@ -65,11 +66,9 @@ jobs:
         shell: bash
         run: |
           python3 - << 'PY' > payload.json
-import json
-msg = open("message.txt", "r", encoding="utf-8").read()
-print(json.dumps({"content": msg}))
-PY
+          import json
+          msg = open("message.txt", "r", encoding="utf-8").read()
+          print(json.dumps({"content": msg}))
+          PY
 
-          curl -sS -H "Content-Type: application/json" \
-            --data-binary @payload.json \
-            "${{ steps.build.outputs.webhook }}"
+          curl -sS -H "Content-Type: application/json"             --data-binary @payload.json             "${{ steps.build.outputs.webhook }}"
