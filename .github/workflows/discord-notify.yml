@@ -4,7 +4,7 @@ on:
   release:
     types: [published]
   push:
-    branches: ["main", "master"]
+    branches: [main, master]
   issues:
     types: [opened, reopened, closed]
   pull_request:
@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Build message content
-        id: msg
+      - name: Decide webhook + build message
+        id: build
         shell: bash
         run: |
           set -euo pipefail
@@ -24,7 +24,6 @@ jobs:
           EVENT="${{ github.event_name }}"
           REPO="${{ github.repository }}"
 
-          # Default webhook (dev). Override for releases.
           WEBHOOK="${{ secrets.DISCORD_WEBHOOK_DEV }}"
 
           if [ "$EVENT" = "release" ]; then
@@ -32,59 +31,46 @@ jobs:
             NAME="${{ github.event.release.name }}"
             TAG="${{ github.event.release.tag_name }}"
             URL="${{ github.event.release.html_url }}"
-            CONTENT="## 🚀 ${NAME:-New Release} (${TAG})\n**Repo:** ${REPO}\n**Link:** ${URL}"
+            MSG="## 🚀 ${NAME:-New Release} (${TAG})\n**Repo:** ${REPO}\n**Link:** ${URL}"
 
           elif [ "$EVENT" = "push" ]; then
             BRANCH="${{ github.ref_name }}"
             COMMIT_MSG="${{ github.event.head_commit.message }}"
             COMMIT_URL="${{ github.event.head_commit.url }}"
             SHORT_SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
-            COMMIT_FIRST_LINE="$(echo "$COMMIT_MSG" | head -n 1)"
-            CONTENT="**📝 Push** to \`${BRANCH}\` — \`${SHORT_SHA}\`\n**Repo:** ${REPO}\n**Message:** ${COMMIT_FIRST_LINE}\n**Link:** ${COMMIT_URL}"
+            FIRST_LINE="$(echo "$COMMIT_MSG" | head -n 1)"
+            MSG="**📝 Push** to \`${BRANCH}\` — \`${SHORT_SHA}\`\n**Repo:** ${REPO}\n**Message:** ${FIRST_LINE}\n**Link:** ${COMMIT_URL}"
 
           elif [ "$EVENT" = "issues" ]; then
             ACTION="${{ github.event.action }}"
             NUM="${{ github.event.issue.number }}"
             TITLE="${{ github.event.issue.title }}"
             URL="${{ github.event.issue.html_url }}"
-            EMOJI="🪲"
-            if [ "$ACTION" = "closed" ]; then EMOJI="✅"; fi
-            CONTENT="**${EMOJI} Issue ${ACTION}** — #${NUM}\n**Repo:** ${REPO}\n**Title:** ${TITLE}\n**Link:** ${URL}"
+            MSG="**🪲 Issue ${ACTION}** — #${NUM}\n**Repo:** ${REPO}\n**Title:** ${TITLE}\n**Link:** ${URL}"
 
           elif [ "$EVENT" = "pull_request" ]; then
             ACTION="${{ github.event.action }}"
             NUM="${{ github.event.pull_request.number }}"
             TITLE="${{ github.event.pull_request.title }}"
             URL="${{ github.event.pull_request.html_url }}"
+            MSG="**🔀 PR ${ACTION}** — #${NUM}\n**Repo:** ${REPO}\n**Title:** ${TITLE}\n**Link:** ${URL}"
 
-            EMOJI="🔀"
-            if [ "$ACTION" = "closed" ]; then
-              if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
-                ACTION="merged"
-                EMOJI="✅"
-              else
-                EMOJI="🚫"
-              fi
-            fi
-
-            CONTENT="**${EMOJI} PR ${ACTION}** — #${NUM}\n**Repo:** ${REPO}\n**Title:** ${TITLE}\n**Link:** ${URL}"
           else
-            CONTENT="GitHub event: ${EVENT} in ${REPO}"
+            MSG="GitHub event: ${EVENT} in ${REPO}"
           fi
 
           echo "webhook=$WEBHOOK" >> "$GITHUB_OUTPUT"
-          {
-            python3 - << 'PY'
-import json, os
-print(json.dumps({"content": os.environ["CONTENT"]}))
-PY
-          } > payload.json
-        env:
-          CONTENT: ""
+          printf '%s' "$MSG" > message.txt
 
-      - name: Send to Discord
+      - name: Send message to Discord
         shell: bash
         run: |
+          python3 - << 'PY'
+import json
+msg = open("message.txt", "r", encoding="utf-8").read()
+print(json.dumps({"content": msg}))
+PY > payload.json
+
           curl -sS -H "Content-Type: application/json" \
             --data-binary @payload.json \
-            "${{ steps.msg.outputs.webhook }}"
+            "${{ steps.build.outputs.webhook }}"
