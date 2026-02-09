@@ -4,6 +4,9 @@
 ## Author: Lanni of Alonsus
 ## Version: 1.0.6
 
+## X-Curse-Project-ID: 1357879
+## X-Wago-ID: E6gv0XN1
+
 ## IconTexture: Interface\AddOns\AchTrackWW\Images\AchTrackWWLogo
 ## DefaultState: Enabled
 ## Category: Collections
@@ -18,6 +21,7 @@ Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 
 minimap.lua
 AchTrackWW.lua
+
 
 
 
