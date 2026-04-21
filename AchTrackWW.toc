@@ -1,8 +1,8 @@
-## Interface: 120000, 120001
+## Interface: 120005, 120001
 ## Title: AchTrackWW – Achievement Tracker
 ## Notes: Tracks a curated list of War Within + Undermine + K'aresh achievements.
 ## Author: Lanni of Alonsus
-## Version: 1.0.7
+## Version: 1.0.8
 
 ## X-Curse-Project-ID: 1357879
 ## X-Wago-ID: E6gv0XN1
