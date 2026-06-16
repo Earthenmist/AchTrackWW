@@ -1,7 +1,7 @@
-## 🧩 Addon Updates (2026-04-21)
+## 🧩 Addon Updates (2026-06-16)
 
-**AchTrackWW** — v1.0.8  
-• Changes: Updated toc for 12.0.5 
+**AchTrackWW** — v1.0.9  
+• Changes: Updated toc for 12.0.7 
 
 • Fixes: None.  
 
