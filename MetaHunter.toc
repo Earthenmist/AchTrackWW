@@ -1,0 +1,41 @@
+## Interface: 120100
+## Title: Meta Hunter
+## Notes: Tracks a curated list of achievements.
+## Author: Earthenmist
+## Version: 2.4.2
+## X-Curse-Project-ID: 1357879
+## X-Wago-ID: E6gv0XN1
+## IconTexture: Interface\AddOns\MetaHunter\Media\MetaHunterLogo
+## AddonCompartmentFunc: MetaHunter_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: MetaHunter_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: MetaHunter_OnAddonCompartmentLeave
+
+## DefaultState: Enabled
+## Category: Collections
+## SavedVariables: MetaHunterDB
+## OptionalDeps: LibStub, CallbackHandler-1.0, Ace3, LibDataBroker-1.1, LibDBIcon-1.0
+
+# Libraries
+embeds.xml
+
+# Core
+Init.lua
+Core\Compat.lua
+
+# Data layer
+Data\Registry.lua
+Data\Overlay.lua
+Data\ExpansionManifest.lua
+
+# Expansion data lives in LoadOnDemand sub-addons and is loaded when selected.
+
+# Engine
+Engine\Completion.lua
+Engine\Tracking.lua
+Engine\TitleResolver.lua
+Engine\Audit.lua
+
+# UI
+UI\Theme.lua
+UI\TreeRow.lua
+UI\MainFrame.lua

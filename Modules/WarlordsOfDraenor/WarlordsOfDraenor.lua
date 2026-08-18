@@ -1,0 +1,131 @@
+-- MetaHunter_WarlordsOfDraenor -- a LoadOnDemand sub-addon.
+local MH = _G.MetaHunter
+if not MH or not MH.Registry then
+  error("MetaHunter_WarlordsOfDraenor: MetaHunter (the main addon) isn't loaded -- check the Dependencies declaration in this addon's .toc")
+end
+local Registry = MH.Registry
+
+local ROOTS = {
+  {
+    achievementID = 10018,
+    title = "Draenor Pathfinder",
+    category = "notable",
+    guide = "Unlock flying in Draenor.",
+    criteria = {
+      {
+        achievementID = 9833,
+        title = "Loremaster of Draenor",
+        criteria = {
+          { achievementID = 8845, title = "As I Walk Through the Valley of the Shadow of Moon" },
+          { achievementID = 8920, title = "Don't Let the Tala-door Hit You on the Way Out" },
+          { achievementID = 8923, title = "Putting the Gore in Gorgrond" },
+          { achievementID = 8925, title = "Between Arak and a Hard Place" },
+          { achievementID = 8927, title = "Nagrandeur" },
+        },
+      },
+      {
+        achievementID = 8935,
+        title = "Draenor Explorer",
+        criteria = {
+          { achievementID = 8937, title = "Explore Frostfire Ridge" },
+          { achievementID = 8938, title = "Explore Shadowmoon Valley" },
+          { achievementID = 8939, title = "Explore Gorgrond" },
+          { achievementID = 8940, title = "Explore Talador" },
+          { achievementID = 8941, title = "Explore Spires of Arak" },
+          { achievementID = 8942, title = "Explore Nagrand" },
+        },
+      },
+      { achievementID = 9564, title = "Securing Draenor" },
+      { achievementID = 10348, title = "Master Treasure Hunter" },
+      { achievementID = 10350, title = "Tanaan Diplomat" },
+    },
+  },
+  {
+    achievementID = 9396,
+    title = "Glory of the Draenor Hero",
+    category = "dungeon",
+    guide = "Complete the Warlords of Draenor dungeon achievements listed by Blizzard.",
+    criteria = {
+      {
+        achievementID = 9391,
+        title = "Draenor Dungeon Hero",
+        criteria = {
+          { achievementID = 9046, title = "Heroic: Bloodmaul Slag Mines" },
+          { achievementID = 9047, title = "Heroic: Iron Docks" },
+          { achievementID = 9049, title = "Heroic: Auchindoun" },
+          { achievementID = 8844, title = "Heroic: Skyreach" },
+          { achievementID = 9054, title = "Heroic: Shadowmoon Burial Grounds" },
+          { achievementID = 9053, title = "Heroic: The Everbloom" },
+          { achievementID = 9052, title = "Heroic: Grimrail Depot" },
+          { achievementID = 9055, title = "Heroic: Upper Blackrock Spire" },
+        },
+      },
+      { achievementID = 9005, title = "Come With Me If You Want to Live" },
+      { achievementID = 9083, title = "Militaristic, Expansionist" },
+      { achievementID = 9082, title = "Take Cover!" },
+      { achievementID = 9024, title = "This Is Why We Can't Have Nice Things" },
+      { achievementID = 9017, title = "Water Management" },
+      { achievementID = 9018, title = "What's Your Sign?" },
+      { achievementID = 9026, title = "Souls of the Lost" },
+      { achievementID = 9058, title = "Leeeeeeeeeeeeeroy...?" },
+      { achievementID = 9057, title = "Dragonmaw? More Like Dragonfall!" },
+      { achievementID = 8993, title = "A Gift of Earth and Fire" },
+      { achievementID = 9008, title = "Is Draenor on Fire?" },
+      { achievementID = 9081, title = "Expert Timing" },
+      { achievementID = 9023, title = "...They All Fall Down" },
+      { achievementID = 9007, title = "No Ticket" },
+      { achievementID = 9223, title = "Weed Whacker" },
+      { achievementID = 9025, title = "Icky Ichors" },
+      { achievementID = 9045, title = "Magnets, How Do They Work?" },
+      { achievementID = 9056, title = "Bridge Over Troubled Fire" },
+    },
+  },
+  {
+    achievementID = 8985,
+    title = "Glory of the Draenor Raider",
+    category = "raid",
+    guide = "Complete the Highmaul and Blackrock Foundry raid achievements listed by Blizzard.",
+    criteria = {
+      { achievementID = 8948, title = "Flame On!" },
+      { achievementID = 8974, title = "More Like Wrecked-us" },
+      { achievementID = 8958, title = "Brothers in Arms" },
+      { achievementID = 8977, title = "Lineage of Power" },
+      { achievementID = 8979, title = "He Shoots, He Ores" },
+      { achievementID = 8981, title = "Fain Would Lie Down" },
+      { achievementID = 8982, title = "There's Always a Bigger Train" },
+      { achievementID = 8983, title = "Would You Give Me a Hand?" },
+      { achievementID = 8952, title = "Ashes, Ashes..." },
+      { achievementID = 8947, title = "Hurry Up, Maggot!" },
+      { achievementID = 8975, title = "A Fungus Among Us" },
+      { achievementID = 8976, title = "Pair Annihilation" },
+      { achievementID = 8978, title = "The Iron Price" },
+      { achievementID = 8980, title = "Stamp Stamp Revolution" },
+      { achievementID = 8929, title = "The Steel Has Been Brought" },
+      { achievementID = 8930, title = "Ya, We've Got Time..." },
+      { achievementID = 8984, title = "Be Quick or Be Dead" },
+    },
+  },
+  {
+    achievementID = 10149,
+    title = "Glory of the Hellfire Raider",
+    category = "raid",
+    guide = "Complete the Hellfire Citadel raid achievements listed by Blizzard.",
+    criteria = {
+      { achievementID = 10026, title = "Nearly Indestructible" },
+      { achievementID = 10013, title = "Waves Came Crashing Down All Around" },
+      { achievementID = 9972, title = "A Race Against Slime" },
+      { achievementID = 9988, title = "Pro Toss" },
+      { achievementID = 10012, title = "This Land Was Green and Good Until..." },
+      { achievementID = 9989, title = "Non-Lethal Enforcer" },
+      { achievementID = 10073, title = "Echoes of Doomfire" },
+      { achievementID = 10057, title = "Turning the Tide" },
+      { achievementID = 10054, title = "Don't Fear the Reaper" },
+      { achievementID = 9979, title = "Get In My Belly!" },
+      { achievementID = 10086, title = "I'm a Soul Man" },
+      { achievementID = 10087, title = "You Gotta Keep 'em Separated" },
+      { achievementID = 10030, title = "Bad Manner(oth)" },
+    },
+  },
+}
+
+Registry:RegisterExpansion("warlords-of-draenor", ROOTS)

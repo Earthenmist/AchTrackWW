@@ -1,0 +1,23 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+
+    <!-- LibStub - required for all libraries below -->
+    <Script file="Libs\LibStub\LibStub.lua"/>
+
+    <!-- CallbackHandler - required by several Ace3 libraries -->
+    <Script file="Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua"/>
+
+    <!-- Ace3: addon object, event/slash-command mixins, saved-variable/profile handling -->
+    <Include file="Libs\AceAddon-3.0\AceAddon-3.0.xml"/>
+    <Include file="Libs\AceEvent-3.0\AceEvent-3.0.xml"/>
+    <Include file="Libs\AceConsole-3.0\AceConsole-3.0.xml"/>
+    <Include file="Libs\AceDB-3.0\AceDB-3.0.xml"/>
+
+    <!-- Ace3: external options surface -->
+    <Include file="Libs\AceGUI-3.0\AceGUI-3.0.xml"/>
+    <Include file="Libs\AceConfig-3.0\AceConfig-3.0.xml"/>
+
+    <!-- LibDataBroker / LibDBIcon - minimap launcher -->
+    <Script file="Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua"/>
+    <Include file="Libs\LibDBIcon-1.0\lib.xml"/>
+
+</Ui>

@@ -1,0 +1,28 @@
+package-as: MetaHunter
+
+manual-changelog: CHANGELOG.md
+
+license-output: LICENSE
+
+move-folders:
+  MetaHunter/Modules/Midnight: MetaHunter_Midnight
+  MetaHunter/Modules/TheWarWithin: MetaHunter_TheWarWithin
+  MetaHunter/Modules/Dragonflight: MetaHunter_Dragonflight
+  MetaHunter/Modules/Shadowlands: MetaHunter_Shadowlands
+  MetaHunter/Modules/BFA: MetaHunter_BFA
+  MetaHunter/Modules/Legion: MetaHunter_Legion
+  MetaHunter/Modules/WarlordsOfDraenor: MetaHunter_WarlordsOfDraenor
+  MetaHunter/Modules/MistsOfPandaria: MetaHunter_MistsOfPandaria
+  MetaHunter/Modules/Cataclysm: MetaHunter_Cataclysm
+  MetaHunter/Modules/Wrath: MetaHunter_Wrath
+  MetaHunter/Modules/TBC: MetaHunter_TBC
+  MetaHunter/Modules/Classic: MetaHunter_Classic
+
+ignore:
+  - .github
+  - README.md
+  - CHANGELOG.md
+  - CHANGES.txt
+  - CONTRIBUTING.md
+  - SECURITY.md
+  - .gitignore

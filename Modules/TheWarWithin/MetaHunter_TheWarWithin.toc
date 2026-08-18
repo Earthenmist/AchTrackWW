@@ -1,0 +1,10 @@
+## Interface: 120100
+## Title: Meta Hunter: The War Within
+## Notes: The War Within achievement data for Meta Hunter. Loaded on demand -- not meant to be enabled or run standalone.
+## Author: Earthenmist
+## Version: 2.4.2
+## IconTexture: Interface\AddOns\MetaHunter\Media\MetaHunterLogo
+## Dependencies: MetaHunter
+## LoadOnDemand: 1
+
+TheWarWithin.lua
